@@ -1,0 +1,23 @@
+# Build artifacts
+target/
+*.class
+*.jar
+*.war
+*.ear
+
+# IDEs and editors
+.idea/
+*.iml
+*.ipr
+*.iws
+.classpath
+.project
+.settings/
+.metadata/
+bin/
+.DS_Store
+
+# Logs and temp files
+*.log
+tmp/
+temp/

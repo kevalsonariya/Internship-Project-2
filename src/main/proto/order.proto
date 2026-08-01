@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+package com.exchange.matching.protobuf;
+
+option java_multiple_files = true;
+option java_package = "com.exchange.matching.protobuf";
+
+/**
+ * Represents the side of an order in the matching engine (BUY or SELL).
+ */
+enum OrderSideProto {
+  ORDER_SIDE_UNSPECIFIED = 0;
+  BUY = 1;
+  SELL = 2;
+}
+
+/**
+ * Represents the execution type of an order (LIMIT or MARKET).
+ */
+enum OrderTypeProto {
+  ORDER_TYPE_UNSPECIFIED = 0;
+  LIMIT = 1;
+  MARKET = 2;
+}
+
+/**
+ * Represents the lifecycle status of an order.
+ */
+enum OrderStatusProto {
+  ORDER_STATUS_UNSPECIFIED = 0;
+  NEW = 1;
+  PARTIALLY_FILLED = 2;
+  FILLED = 3;
+  CANCELLED = 4;
+  REJECTED = 5;
+}
+
+/**
+ * Protocol Buffer payload for an Order in the matching engine.
+ */
+message OrderProto {
+  string order_id = 1;
+  string symbol = 2;
+  OrderSideProto side = 3;
+  double price = 4;
+  double quantity = 5;
+  double filled_quantity = 6;
+  int64 timestamp = 7;
+  OrderTypeProto order_type = 8;
+  OrderStatusProto status = 9;
+}

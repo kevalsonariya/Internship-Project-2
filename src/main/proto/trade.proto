@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package com.exchange.matching.protobuf;
+
+option java_multiple_files = true;
+option java_package = "com.exchange.matching.protobuf";
+
+/**
+ * Protocol Buffer payload for an executed Trade.
+ */
+message TradeProto {
+  string trade_id = 1;
+  string symbol = 2;
+  string buy_order_id = 3;
+  string sell_order_id = 4;
+  double price = 5;
+  double quantity = 6;
+  int64 timestamp = 7;
+  string maker_order_id = 8;
+  string taker_order_id = 9;
+}
