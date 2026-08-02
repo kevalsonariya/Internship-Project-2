@@ -56,6 +56,15 @@ public class OrderBook implements IOrderBook {
         if (order == null || !symbol.equalsIgnoreCase(order.getSymbol())) {
             return false;
         }
+        if (order.getOrderId() == null || order.getOrderId().isEmpty()) {
+            return false;
+        }
+        if (orderIndex.containsKey(order.getOrderId())) {
+            return false;
+        }
+        if (order.getPrice() <= 0.0 || order.getQuantity() <= 0.0) {
+            return false;
+        }
 
         NavigableMap<Double, ArrayDeque<Order>> targetMap = (order.getSide() == OrderSide.BUY) ? bids : asks;
         targetMap.computeIfAbsent(order.getPrice(), p -> new ArrayDeque<>()).offer(order);
