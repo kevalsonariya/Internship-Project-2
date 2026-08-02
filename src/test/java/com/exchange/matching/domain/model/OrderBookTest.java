@@ -80,4 +80,27 @@ class OrderBookTest {
         assertEquals(49000.0, depth.bids().get(0).price());
         assertEquals(48000.0, depth.bids().get(1).price());
     }
+
+    @Test
+    @DisplayName("Should reject invalid orders (duplicate ID, invalid price/quantity, missing ID)")
+    void testOrderValidations() {
+        Order valid = new Order("B1", "BTC/USDT", OrderSide.BUY, 49000.0, 1.0, System.currentTimeMillis(), OrderType.LIMIT);
+        assertTrue(orderBook.addOrder(valid));
+
+        // Duplicate ID
+        Order duplicate = new Order("B1", "BTC/USDT", OrderSide.BUY, 50000.0, 2.0, System.currentTimeMillis(), OrderType.LIMIT);
+        assertFalse(orderBook.addOrder(duplicate));
+
+        // Invalid price
+        Order invalidPrice = new Order("B2", "BTC/USDT", OrderSide.BUY, 0.0, 1.0, System.currentTimeMillis(), OrderType.LIMIT);
+        assertFalse(orderBook.addOrder(invalidPrice));
+
+        // Invalid quantity
+        Order invalidQty = new Order("B3", "BTC/USDT", OrderSide.BUY, 49000.0, -1.0, System.currentTimeMillis(), OrderType.LIMIT);
+        assertFalse(orderBook.addOrder(invalidQty));
+
+        // Empty ID
+        Order emptyId = new Order("", "BTC/USDT", OrderSide.BUY, 49000.0, 1.0, System.currentTimeMillis(), OrderType.LIMIT);
+        assertFalse(orderBook.addOrder(emptyId));
+    }
 }

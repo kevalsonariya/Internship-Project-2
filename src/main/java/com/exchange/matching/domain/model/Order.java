@@ -94,14 +94,14 @@ public class Order {
      */
     public void init(String orderId, String symbol, OrderSide side, double price, double quantity,
                      long timestamp, OrderType orderType) {
-        this.orderId = orderId;
-        this.symbol = symbol;
-        this.side = side;
+        this.orderId = Objects.requireNonNull(orderId, "orderId must not be null");
+        this.symbol = Objects.requireNonNull(symbol, "symbol must not be null");
+        this.side = Objects.requireNonNull(side, "side must not be null");
         this.price = price;
         this.quantity = quantity;
         this.filledQuantity = 0.0;
         this.timestamp = timestamp;
-        this.orderType = orderType;
+        this.orderType = Objects.requireNonNull(orderType, "orderType must not be null");
         this.status = OrderStatus.NEW;
     }
 
