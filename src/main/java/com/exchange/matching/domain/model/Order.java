@@ -9,7 +9,7 @@ import java.util.Objects;
  * Core domain entity representing an Order submitted to the matching engine.
  * <p>
  * Encapsulates order state including identifier, symbol, side, price, quantity,
- * execution type, and lifecycle status.
+ * execution type, and lifecycle status. Designed for zero-GC object pooling via {@link #reset()}.
  * </p>
  */
 public class Order {
@@ -79,6 +79,45 @@ public class Order {
         this.timestamp = timestamp;
         this.orderType = orderType;
         this.status = status;
+    }
+
+    /**
+     * Re-initializes a pooled order instance with new parameters.
+     *
+     * @param orderId   unique order identifier
+     * @param symbol    trading instrument symbol
+     * @param side      BUY or SELL side
+     * @param price     limit price per unit
+     * @param quantity  total order quantity
+     * @param timestamp submission timestamp
+     * @param orderType LIMIT or MARKET execution type
+     */
+    public void init(String orderId, String symbol, OrderSide side, double price, double quantity,
+                     long timestamp, OrderType orderType) {
+        this.orderId = orderId;
+        this.symbol = symbol;
+        this.side = side;
+        this.price = price;
+        this.quantity = quantity;
+        this.filledQuantity = 0.0;
+        this.timestamp = timestamp;
+        this.orderType = orderType;
+        this.status = OrderStatus.NEW;
+    }
+
+    /**
+     * Resets all fields of this order to default values for object pool reuse.
+     */
+    public void reset() {
+        this.orderId = null;
+        this.symbol = null;
+        this.side = null;
+        this.price = 0.0;
+        this.quantity = 0.0;
+        this.filledQuantity = 0.0;
+        this.timestamp = 0L;
+        this.orderType = null;
+        this.status = OrderStatus.NEW;
     }
 
     /**

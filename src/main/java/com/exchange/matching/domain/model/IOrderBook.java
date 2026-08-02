@@ -1,0 +1,99 @@
+package com.exchange.matching.domain.model;
+
+import com.exchange.matching.domain.enums.OrderSide;
+import java.util.List;
+
+/**
+ * Public interface defining contract and state management operations for an OrderBook.
+ * <p>
+ * Maintains price-time priority queues for bids and asks for a single trading symbol.
+ * </p>
+ */
+public interface IOrderBook {
+
+    /**
+     * Gets the trading symbol managed by this order book.
+     *
+     * @return trading pair symbol (e.g. BTC-USDT)
+     */
+    String getSymbol();
+
+    /**
+     * Adds an order into the order book without triggering matching.
+     *
+     * @param order order to add to resting orders
+     * @return true if order was added successfully, false otherwise
+     */
+    boolean addOrder(Order order);
+
+    /**
+     * Cancels a resting order in the order book by its order ID.
+     *
+     * @param orderId unique identifier of the order to cancel
+     * @return the cancelled {@link Order} if found and removed, or null if not found
+     */
+    Order cancelOrder(String orderId);
+
+    /**
+     * Looks up a resting order by its unique order ID.
+     *
+     * @param orderId unique identifier of the order
+     * @return resting {@link Order} instance, or null if not found
+     */
+    Order getOrder(String orderId);
+
+    /**
+     * Gets active aggregated bid price levels (ordered from highest price to lowest price).
+     *
+     * @return list of bid price levels
+     */
+    List<PriceLevel> getBids();
+
+    /**
+     * Gets active aggregated ask price levels (ordered from lowest price to highest price).
+     *
+     * @return list of ask price levels
+     */
+    List<PriceLevel> getAsks();
+
+    /**
+     * Gets the current best bid (highest price level in bids).
+     *
+     * @return top bid {@link PriceLevel}, or null if bids are empty
+     */
+    PriceLevel getBestBid();
+
+    /**
+     * Gets the current best ask (lowest price level in asks).
+     *
+     * @return top ask {@link PriceLevel}, or null if asks are empty
+     */
+    PriceLevel getBestAsk();
+
+    /**
+     * Generates a MarketData snapshot up to the specified max depth levels.
+     *
+     * @param maxDepth maximum number of price levels to include for bids and asks
+     * @return a {@link MarketData} snapshot
+     */
+    MarketData getDepth(int maxDepth);
+
+    /**
+     * Gets total count of active resting bid orders in the order book.
+     *
+     * @return total resting bid order count
+     */
+    int getBidOrderCount();
+
+    /**
+     * Gets total count of active resting ask orders in the order book.
+     *
+     * @return total resting ask order count
+     */
+    int getAskOrderCount();
+
+    /**
+     * Clears all resting orders and price levels from the order book.
+     */
+    void clear();
+}
