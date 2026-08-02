@@ -2,6 +2,7 @@ package com.exchange.matching.domain.model;
 
 import com.exchange.matching.domain.enums.OrderSide;
 import com.exchange.matching.domain.enums.OrderStatus;
+import com.exchange.matching.domain.enums.OrderType;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -31,6 +32,7 @@ public class OrderBook implements IOrderBook {
 
     private double lastPrice;
     private double volume24h;
+    private long tradeIdSequence;
 
     /**
      * Constructs a new empty OrderBook for the specified trading symbol.
@@ -44,6 +46,7 @@ public class OrderBook implements IOrderBook {
         this.orderIndex = new HashMap<>();
         this.lastPrice = 0.0;
         this.volume24h = 0.0;
+        this.tradeIdSequence = 0L;
     }
 
     @Override
@@ -161,6 +164,108 @@ public class OrderBook implements IOrderBook {
         bids.clear();
         asks.clear();
         orderIndex.clear();
+    }
+
+    @Override
+    public List<Trade> match(Order order) {
+        if (order == null || !symbol.equalsIgnoreCase(order.getSymbol())) {
+            return List.of();
+        }
+        if (order.getOrderId() == null || order.getOrderId().isEmpty()) {
+            return List.of();
+        }
+        if (orderIndex.containsKey(order.getOrderId())) {
+            return List.of();
+        }
+        if (order.getPrice() <= 0.0 && order.getOrderType() == OrderType.LIMIT) {
+            return List.of();
+        }
+        if (order.getQuantity() <= 0.0) {
+            return List.of();
+        }
+
+        List<Trade> trades = null;
+        NavigableMap<Double, ArrayDeque<Order>> opposingMap = (order.getSide() == OrderSide.BUY) ? asks : bids;
+
+        while (order.getRemainingQuantity() > 0.0 && !opposingMap.isEmpty()) {
+            Map.Entry<Double, ArrayDeque<Order>> bestEntry = opposingMap.firstEntry();
+            double opposingPrice = bestEntry.getKey();
+
+            // Price crossing check for LIMIT orders
+            if (order.getOrderType() == OrderType.LIMIT) {
+                if (order.getSide() == OrderSide.BUY && opposingPrice > order.getPrice()) {
+                    break;
+                }
+                if (order.getSide() == OrderSide.SELL && opposingPrice < order.getPrice()) {
+                    break;
+                }
+            }
+
+            ArrayDeque<Order> queue = bestEntry.getValue();
+            while (order.getRemainingQuantity() > 0.0 && !queue.isEmpty()) {
+                Order maker = queue.peek();
+                if (maker == null) {
+                    queue.poll();
+                    continue;
+                }
+
+                double matchQty = Math.min(order.getRemainingQuantity(), maker.getRemainingQuantity());
+                if (matchQty <= 0.0) {
+                    break;
+                }
+
+                order.executeFill(matchQty);
+                maker.executeFill(matchQty);
+
+                this.lastPrice = opposingPrice;
+                this.volume24h += matchQty;
+
+                String tradeId = "T-" + System.currentTimeMillis() + "-" + (++tradeIdSequence);
+
+                String buyOrderId = (order.getSide() == OrderSide.BUY) ? order.getOrderId() : maker.getOrderId();
+                String sellOrderId = (order.getSide() == OrderSide.BUY) ? maker.getOrderId() : order.getOrderId();
+
+                Trade trade = new Trade(
+                        tradeId,
+                        symbol,
+                        buyOrderId,
+                        sellOrderId,
+                        opposingPrice,
+                        matchQty,
+                        System.currentTimeMillis(),
+                        maker.getOrderId(),
+                        order.getOrderId()
+                );
+
+                if (trades == null) {
+                    trades = new ArrayList<>();
+                }
+                trades.add(trade);
+
+                if (maker.isFilled()) {
+                    queue.poll();
+                    orderIndex.remove(maker.getOrderId());
+                }
+            }
+
+            if (queue.isEmpty()) {
+                opposingMap.remove(opposingPrice);
+            }
+        }
+
+        if (order.isFilled()) {
+            // Fully filled, no need to rest
+        } else {
+            if (order.getOrderType() == OrderType.LIMIT) {
+                NavigableMap<Double, ArrayDeque<Order>> targetMap = (order.getSide() == OrderSide.BUY) ? bids : asks;
+                targetMap.computeIfAbsent(order.getPrice(), p -> new ArrayDeque<>()).offer(order);
+                orderIndex.put(order.getOrderId(), order);
+            } else if (order.getOrderType() == OrderType.MARKET) {
+                order.setStatus(OrderStatus.CANCELLED);
+            }
+        }
+
+        return trades == null ? List.of() : trades;
     }
 
     /**
