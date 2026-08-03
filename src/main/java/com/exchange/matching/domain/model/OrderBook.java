@@ -23,13 +23,41 @@ import java.util.TreeMap;
  */
 public class OrderBook implements IOrderBook {
 
+    /**
+     * The trading instrument symbol managed by this order book (e.g. BTC-USDT).
+     */
     private final String symbol;
+
+    /**
+     * Navigable map for buy orders (bids), sorted in descending order of price.
+     * Each price maps to an {@link ArrayDeque} of resting orders at that price level to maintain FIFO order.
+     */
     private final NavigableMap<Double, ArrayDeque<Order>> bids;
+
+    /**
+     * Navigable map for sell orders (asks), sorted in ascending order of price.
+     * Each price maps to an {@link ArrayDeque} of resting orders at that price level to maintain FIFO order.
+     */
     private final NavigableMap<Double, ArrayDeque<Order>> asks;
+
+    /**
+     * O(1) index map mapping unique order ID to the active resting {@link Order} in the book.
+     */
     private final Map<String, Order> orderIndex;
 
+    /**
+     * Price of the last executed trade.
+     */
     private double lastPrice;
+
+    /**
+     * Rolling 24-hour trading volume.
+     */
     private double volume24h;
+
+    /**
+     * Sequence counter for generating unique trade identifiers.
+     */
     private long tradeIdSequence;
 
     /**
@@ -47,11 +75,17 @@ public class OrderBook implements IOrderBook {
         this.tradeIdSequence = 0L;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public String getSymbol() {
         return symbol;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public boolean addOrder(Order order) {
         if (order == null || !symbol.equalsIgnoreCase(order.getSymbol())) {
@@ -73,6 +107,9 @@ public class OrderBook implements IOrderBook {
         return true;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public Order cancelOrder(String orderId) {
         if (orderId == null) {
@@ -97,21 +134,33 @@ public class OrderBook implements IOrderBook {
         return order;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public Order getOrder(String orderId) {
         return orderIndex.get(orderId);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public List<PriceLevel> getBids() {
         return buildPriceLevels(bids, Integer.MAX_VALUE);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public List<PriceLevel> getAsks() {
         return buildPriceLevels(asks, Integer.MAX_VALUE);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public PriceLevel getBestBid() {
         if (bids.isEmpty()) {
@@ -121,6 +170,9 @@ public class OrderBook implements IOrderBook {
         return createPriceLevel(entry.getKey(), entry.getValue());
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public PriceLevel getBestAsk() {
         if (asks.isEmpty()) {
@@ -130,6 +182,9 @@ public class OrderBook implements IOrderBook {
         return createPriceLevel(entry.getKey(), entry.getValue());
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public MarketData getDepth(int maxDepth) {
         int limit = Math.max(1, maxDepth);
@@ -147,16 +202,25 @@ public class OrderBook implements IOrderBook {
         );
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public int getBidOrderCount() {
         return countOrders(bids);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public int getAskOrderCount() {
         return countOrders(asks);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void clear() {
         bids.clear();
@@ -164,6 +228,9 @@ public class OrderBook implements IOrderBook {
         orderIndex.clear();
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public List<Trade> match(Order order) {
         if (order == null || !symbol.equalsIgnoreCase(order.getSymbol())) {
@@ -268,6 +335,10 @@ public class OrderBook implements IOrderBook {
 
     /**
      * Helper method to construct price levels up to max depth limit.
+     *
+     * @param map      the bid or ask map to build levels from
+     * @param maxDepth maximum number of price levels to include
+     * @return list of aggregated price levels
      */
     private List<PriceLevel> buildPriceLevels(NavigableMap<Double, ArrayDeque<Order>> map, int maxDepth) {
         List<PriceLevel> levels = new ArrayList<>();
@@ -284,6 +355,10 @@ public class OrderBook implements IOrderBook {
 
     /**
      * Helper method to calculate aggregate quantity and order count for a price queue.
+     *
+     * @param price the price level
+     * @param queue the queue of resting orders at this price
+     * @return a {@link PriceLevel} project representation
      */
     private PriceLevel createPriceLevel(double price, ArrayDeque<Order> queue) {
         double totalQuantity = 0.0;
@@ -296,6 +371,9 @@ public class OrderBook implements IOrderBook {
 
     /**
      * Helper method to count total orders in a side map.
+     *
+     * @param map the bid or ask navigable map to count orders in
+     * @return total order count in the map
      */
     private int countOrders(NavigableMap<Double, ArrayDeque<Order>> map) {
         int total = 0;
