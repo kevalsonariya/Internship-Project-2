@@ -35,6 +35,20 @@ public class DisruptorEngine {
      * @param waitStrategy wait strategy for consumers waiting on the ring buffer
      */
     public DisruptorEngine(int bufferSize, WaitStrategy waitStrategy) {
+        this(bufferSize, waitStrategy, new com.exchange.matching.domain.model.OrderBook("DEFAULT"), new com.exchange.matching.infrastructure.pool.OrderPool());
+    }
+
+    /**
+     * Constructs a DisruptorEngine with custom capacity, wait strategy, order book, and order pool.
+     *
+     * @param bufferSize   must be a power of 2
+     * @param waitStrategy wait strategy for consumers waiting on the ring buffer
+     * @param orderBook    the order book to match against
+     * @param orderPool    the order pool for borrowing/returning orders
+     */
+    public DisruptorEngine(int bufferSize, WaitStrategy waitStrategy, 
+                           com.exchange.matching.domain.model.IOrderBook orderBook, 
+                           com.exchange.matching.infrastructure.pool.OrderPool orderPool) {
         if (Integer.bitCount(bufferSize) != 1) {
             throw new IllegalArgumentException("bufferSize must be a power of 2");
         }
@@ -54,12 +68,15 @@ public class DisruptorEngine {
                 waitStrategy
         );
 
-        // Setup a temporary dummy handler since LMAX Disruptor requires a handler pipeline to start.
-        // Handlers will be implemented and replaced in later tasks.
-        EventHandler<OrderEvent> dummyHandler = (event, sequence, endOfBatch) -> {
-            // No-op for infrastructure setup stage
-        };
-        this.disruptor.handleEventsWith(dummyHandler);
+        // Instantiates pipeline event handlers
+        RiskValidationHandler riskHandler = new RiskValidationHandler();
+        MatchingEngineHandler matchingHandler = new MatchingEngineHandler(orderBook, orderPool);
+        JournalingHandler journalHandler = new JournalingHandler();
+
+        // Wire handlers sequentially: Risk -> Matching -> Journal
+        this.disruptor.handleEventsWith(riskHandler)
+                      .then(matchingHandler)
+                      .then(journalHandler);
 
         this.producer = new OrderEventProducer(disruptor.getRingBuffer());
     }
