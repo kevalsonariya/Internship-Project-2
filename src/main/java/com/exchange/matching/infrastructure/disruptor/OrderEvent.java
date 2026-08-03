@@ -19,6 +19,7 @@ public class OrderEvent {
     private double quantity;
     private long timestamp;
     private OrderType orderType;
+    private boolean rejected;
 
     /**
      * Default constructor. Pre-allocated instances start with default uninitialized state.
@@ -38,6 +39,7 @@ public class OrderEvent {
         this.quantity = 0.0;
         this.timestamp = 0L;
         this.orderType = null;
+        this.rejected = false;
     }
 
     public String getOrderId() {
@@ -96,6 +98,14 @@ public class OrderEvent {
         this.orderType = orderType;
     }
 
+    public boolean isRejected() {
+        return rejected;
+    }
+
+    public void setRejected(boolean rejected) {
+        this.rejected = rejected;
+    }
+
     @Override
     public String toString() {
         return "OrderEvent{" +
@@ -106,6 +116,7 @@ public class OrderEvent {
                 ", quantity=" + quantity +
                 ", timestamp=" + timestamp +
                 ", orderType=" + orderType +
+                ", rejected=" + rejected +
                 '}';
     }
 }
