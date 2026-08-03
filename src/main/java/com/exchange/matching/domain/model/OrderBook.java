@@ -14,13 +14,11 @@ import java.util.Objects;
 import java.util.TreeMap;
 
 /**
- * Skeleton implementation of {@link IOrderBook} maintaining Price-Time Priority for limit orders.
+ * High-performance implementation of {@link IOrderBook} maintaining Price-Time (FIFO) Priority.
  * <p>
  * Bids are maintained in descending price order; Asks are maintained in ascending price order.
  * An internal index map provides O(1) order lookup and cancellation.
- * </p>
- * <p>
- * <i>Note: Matching execution mechanics will be implemented in Day 3.</i>
+ * Matches incoming limit and market orders against resting order queues.
  * </p>
  */
 public class OrderBook implements IOrderBook {
