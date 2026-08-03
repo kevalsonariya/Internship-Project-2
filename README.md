@@ -73,22 +73,152 @@ mvn test
 
 ---
 
-## Day 1 Architecture & Interfaces
+## Day 1 Architecture Summary
 
-### Project Architecture Overview
-The Day 1 codebase establishes the core business domain entities, object pools, and matching engine interface contracts. It represents the innermost layer of Clean Architecture:
-1. **Domain Model**: Fully decoupled from external frameworks and libraries.
-   - [Order](file:///c:/Users/Raval%20Darshan/OneDrive/Desktop/internship-project-2/src/main/java/com/exchange/matching/domain/model/Order.java): Encapsulates order state (price, quantity, side, type, status, and lifecycle transitions). Designed for zero-GC pooling.
-   - [OrderBook](file:///c:/Users/Raval%20Darshan/OneDrive/Desktop/internship-project-2/src/main/java/com/exchange/matching/domain/model/OrderBook.java): Stateful matching engine implementation maintaining two directional queues (TreeMap of ArrayDeques) and a hash index map for fast $O(1)$ lookup and cancellations.
-   - [Trade](file:///c:/Users/Raval%20Darshan/OneDrive/Desktop/internship-project-2/src/main/java/com/exchange/matching/domain/model/Trade.java): A record capturing transaction details generated from matching.
-   - [PriceLevel](file:///c:/Users/Raval%20Darshan/OneDrive/Desktop/internship-project-2/src/main/java/com/exchange/matching/domain/model/PriceLevel.java) / [MarketData](file:///c:/Users/Raval%20Darshan/OneDrive/Desktop/internship-project-2/src/main/java/com/exchange/matching/domain/model/MarketData.java): Lightweight structures for data projection and market feed generation.
-2. **Infrastructure (Object Pools)**:
-   - [ObjectPool](file:///c:/Users/Raval%20Darshan/OneDrive/Desktop/internship-project-2/src/main/java/com/exchange/matching/infrastructure/pool/ObjectPool.java) & [OrderPool](file:///c:/Users/Raval%20Darshan/OneDrive/Desktop/internship-project-2/src/main/java/com/exchange/matching/infrastructure/pool/OrderPool.java): Avoids garbage collection pressure during peak volume by reusing order objects.
+The Day 1 codebase lays the foundation of a high-performance, low-latency cryptocurrency matching engine. It implements the innermost layer of Clean Architecture (Domain and Infrastructure core), completely decoupled from any external application framework.
 
-### Public Interfaces
-- **[IOrderBook](file:///c:/Users/Raval%20Darshan/OneDrive/Desktop/internship-project-2/src/main/java/com/exchange/matching/domain/model/IOrderBook.java)**: The primary interface defining order matching (`match(Order)`), cancellation (`cancelOrder(String)`), lookup (`getOrder(String)`), depth snapshots (`getDepth(int)`), and statistics retrieval.
-- **[Order](file:///c:/Users/Raval%20Darshan/OneDrive/Desktop/internship-project-2/src/main/java/com/exchange/matching/domain/model/Order.java)**: Represents order parameters and tracks executions (supports both limit and market orders).
-- **[Trade](file:///c:/Users/Raval%20Darshan/OneDrive/Desktop/internship-project-2/src/main/java/com/exchange/matching/domain/model/Trade.java)**: Read-only record capturing matched quantities, execution prices, maker/taker identifiers.
+### 1. Domain Model: Responsibilities & Relationships
+- **[Order](file:///c:/Users/Raval%20Darshan/OneDrive/Desktop/internship-project-2/src/main/java/com/exchange/matching/domain/model/Order.java)**: Represents a client's buy/sell instruction (Limit or Market). It is a stateful entity containing properties like side, price, quantity, executed quantity, and status. It exposes a `reset()` method to clear its state for zero-GC object pool recycling.
+- **[Trade](file:///c:/Users/Raval%20Darshan/OneDrive/Desktop/internship-project-2/src/main/java/com/exchange/matching/domain/model/Trade.java)**: A read-only `record` capturing executed matches. It relates a taker order against a resting maker order, tracking the executed quantity, price, execution timestamp, and respective order identifiers.
+- **[PriceLevel](file:///c:/Users/Raval%20Darshan/OneDrive/Desktop/internship-project-2/src/main/java/com/exchange/matching/domain/model/PriceLevel.java)**: A read-only projection `record` showing aggregated liquidity depth (total quantity and order count) resting at a specific price point.
+- **[MarketData](file:///c:/Users/Raval%20Darshan/OneDrive/Desktop/internship-project-2/src/main/java/com/exchange/matching/domain/model/MarketData.java)**: Represents the snapshot of the order book up to a specific depth (list of bid/ask `PriceLevel`s), the last trade price, and rolling 24-hour volume.
+- **[IOrderBook](file:///c:/Users/Raval%20Darshan/OneDrive/Desktop/internship-project-2/src/main/java/com/exchange/matching/domain/model/IOrderBook.java)**: The contract for order book operations, defining methods for order matching, addition, cancellations, snapshots, and statistical tracking.
+- **[OrderBook](file:///c:/Users/Raval%20Darshan/OneDrive/Desktop/internship-project-2/src/main/java/com/exchange/matching/domain/model/OrderBook.java)**: The core stateful implementation of `IOrderBook`. It manages the active order queues and matches them against incoming orders.
+
+```mermaid
+classDiagram
+    direction TB
+    class IOrderBook {
+        <<interface>>
+        +getSymbol() String
+        +addOrder(Order order) boolean
+        +cancelOrder(String orderId) Order
+        +getOrder(String orderId) Order
+        +getBids() List~PriceLevel~
+        +getAsks() List~PriceLevel~
+        +getBestBid() PriceLevel
+        +getBestAsk() PriceLevel
+        +getDepth(int maxDepth) MarketData
+        +match(Order order) List~Trade~
+        +clear() void
+    }
+    class OrderBook {
+        -String symbol
+        -NavigableMap~Double, ArrayDeque~Order~~ bids
+        -NavigableMap~Double, ArrayDeque~Order~~ asks
+        -Map~String, Order~ orderIndex
+        -double lastPrice
+        -double volume24h
+        -long tradeIdSequence
+    }
+    class Order {
+        -String orderId
+        -String symbol
+        -OrderSide side
+        -double price
+        -double quantity
+        -double filledQuantity
+        -long timestamp
+        -OrderType orderType
+        -OrderStatus status
+        +executeFill(double fillQuantity) void
+        +isFilled() boolean
+        +reset() void
+    }
+    class Trade {
+        <<record>>
+        +String tradeId
+        +String symbol
+        +String buyOrderId
+        +String sellOrderId
+        +double price
+        +double quantity
+        +long timestamp
+        +String makerOrderId
+        +String takerOrderId
+    }
+    class PriceLevel {
+        <<record>>
+        +double price
+        +double quantity
+        +int orderCount
+    }
+    class MarketData {
+        <<record>>
+        +String symbol
+        +long timestamp
+        +List~PriceLevel~ bids
+        +List~PriceLevel~ asks
+        +double lastPrice
+        +double volume24h
+    }
+
+    IOrderBook <|.. OrderBook
+    OrderBook --> Order : manages
+    OrderBook ..> Trade : produces
+    OrderBook ..> MarketData : projects
+    MarketData --> PriceLevel : aggregates
+```
+
+### 2. Price-Time Priority (FIFO) Matching Implementation
+`OrderBook` implements price-time priority matching using dual data structures:
+- **Bids and Asks Queues**: Bids are stored in a `TreeMap` sorted in descending price order (`Collections.reverseOrder()`). Asks are sorted in ascending price order.
+- **Time Priority Queue**: For each price point, a FIFO queue (`ArrayDeque<Order>`) maintains orders. When an order is added, it is appended to the tail of the queue (`offer`). During matching, order execution always begins from the head of the queue (`peek`/`poll`).
+- **Matching Mechanics**: Incoming taker orders are matched against opposing maker queues starting at the best available price.
+  - For **LIMIT** orders, matching continues while the order has remaining quantity and the incoming price crosses the opposing price (buy price $\ge$ ask price, or sell price $\le$ bid price). Unfilled quantity is rested in the book.
+  - For **MARKET** orders, matching continues at the best available prices until the order is fully filled or opposing liquidity is exhausted. Any remaining unfilled quantity is cancelled immediately.
+
+### 3. Object Pooling (GC-Free Memory Management)
+To prevent Garbage Collection latency spikes under high load, the engine implements custom object pooling in the infrastructure layer:
+- **[ObjectPool&lt;T&gt;](file:///c:/Users/Raval%20Darshan/OneDrive/Desktop/internship-project-2/src/main/java/com/exchange/matching/infrastructure/pool/ObjectPool.java)**: A generic pre-allocated circular buffer (using `ArrayDeque`) that manages object instances.
+- **[OrderPool](file:///c:/Users/Raval%20Darshan/OneDrive/Desktop/internship-project-2/src/main/java/com/exchange/matching/infrastructure/pool/OrderPool.java)**: A specialized pool managing `Order` entities (defaults to 10k pre-allocated, max 100k).
+  - **Borrowing (`borrowOrder`)**: Pulls a pre-allocated order from the pool. If empty, it allocates a new one.
+  - **Recycling (`returnOrder`)**: Resets all fields of the order (references nulled, numbers set to `0.0`/`0L`, status to `NEW`) and returns it to the pool queue.
+
+### 4. Performance Considerations
+- **$O(1)$ Order Lookup & Cancellations**: An internal hash map `orderIndex` maps `orderId` to `Order` objects, allowing instant lookup and deletion.
+- **No Concurrency Locks**: `OrderBook` is deliberately non-thread-safe. In the final architecture (Day 2), thread safety is achieved through thread confinement, where a single LMAX Disruptor thread sequentially processes all modifications to the order book.
+- **Zero Object Allocation (Zero-GC)**: Borrowing pre-existing orders from the pool prevents JVM garbage collector heap allocation overhead during order ingestion.
+- **Lightweight Projections**: `PriceLevel` and `Trade` are implemented as Java `record`s to ensure light, read-only stack allocation where possible.
+
+### 5. Protobuf Schemas & Domain Mapping
+The system leverages Google Protocol Buffers for high-efficiency network serialization. The mapping between serialization messages and core domain objects is handled by the thread-safe **[ProtobufMapper](file:///c:/Users/Raval%20Darshan/OneDrive/Desktop/internship-project-2/src/main/java/com/exchange/matching/infrastructure/protobuf/ProtobufMapper.java)** utility class.
+
+- **[order.proto](file:///c:/Users/Raval%20Darshan/OneDrive/Desktop/internship-project-2/src/main/proto/order.proto)**: Defines `OrderProto`, `OrderSideProto`, `OrderTypeProto`, and `OrderStatusProto`.
+  - Maps to/from domain `Order`, `OrderSide`, `OrderType`, and `OrderStatus`.
+- **[trade.proto](file:///c:/Users/Raval%20Darshan/OneDrive/Desktop/internship-project-2/src/main/proto/trade.proto)**: Defines `TradeProto`.
+  - Maps to/from domain `Trade` record.
+- **[market_data.proto](file:///c:/Users/Raval%20Darshan/OneDrive/Desktop/internship-project-2/src/main/proto/market_data.proto)**: Defines `MarketDataProto` and `PriceLevelProto`.
+  - Maps to/from domain `MarketData` and `PriceLevel` records.
+
+---
+
+## Public Interfaces Documentation
+
+### `IOrderBook`
+The main interface specifying how to interact with the order book.
+```java
+public interface IOrderBook {
+    String getSymbol();
+    boolean addOrder(Order order);
+    Order cancelOrder(String orderId);
+    Order getOrder(String orderId);
+    List<PriceLevel> getBids();
+    List<PriceLevel> getAsks();
+    PriceLevel getBestBid();
+    PriceLevel getBestAsk();
+    MarketData getDepth(int maxDepth);
+    int getBidOrderCount();
+    int getAskOrderCount();
+    void clear();
+    List<Trade> match(Order order);
+}
+```
+
+- **`match(Order order)`**: Matches an incoming taker order against resting liquidity. Returns a list of executed trades. Remaining limit quantities are rested; unfilled market quantities are cancelled.
+- **`addOrder(Order order)`**: Manually registers a resting order into the book without triggering matching checks.
+- **`cancelOrder(String orderId)`**: Removes an order from the book, updates its status to `CANCELLED`, and returns the order.
+- **`getDepth(int maxDepth)`**: Generates an aggregated market depth snapshot containing bids, asks, last traded price, and volume.
 
 ---
 
@@ -97,5 +227,5 @@ The Day 1 codebase establishes the core business domain entities, object pools, 
 For developers continuing on Day 2:
 1. **LMAX Disruptor Pipeline Integration**: Wrap the single-threaded `OrderBook` execution inside the LMAX Disruptor thread-safe ring buffer handler to enable ultra-low-latency asynchronous execution.
 2. **Journaling & Durability**: Setup the journaling handler to serialize incoming commands to disk.
-3. **Multi-threaded Architecture Model**: The `OrderBook` state is purposely not thread-safe. Thread safety and lock-free execution are achieved by isolating write access to a single dedicated consumer thread. Maintain this model when writing concurrency handlers.
+3. **Multithreaded Architecture Model**: Maintain the lock-free single-writer principle. Do not introduce synchronization inside `OrderBook`; route all writes through the Disruptor Ring Buffer.
 
