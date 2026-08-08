@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package com.exchange.matching.protobuf;
+
+option java_multiple_files = true;
+option java_package = "com.exchange.matching.protobuf";
+
+import "order.proto";
+import "market_data.proto";
+
+/**
+ * Request payload for submitting an order to the matching engine.
+ */
+message SubmitOrderRequest {
+  OrderProto order = 1;
+}
+
+/**
+ * Response payload indicating the receipt/publishing status of an order submission.
+ */
+message SubmitOrderResponse {
+  bool success = 1;
+  string message = 2;
+  string order_id = 3;
+  int64 timestamp = 4;
+}
+
+/**
+ * Request payload for subscribing to real-time market data streaming updates.
+ */
+message MarketDataStreamRequest {
+  string symbol = 1;
+  int32 max_depth = 2;
+  int32 update_interval_ms = 3;
+}
+
+/**
+ * High-Performance Order Matching gRPC Service definition.
+ */
+service OrderMatchingService {
+  /**
+   * Publishes an incoming order onto the Disruptor ring buffer.
+   */
+  rpc SubmitOrder (SubmitOrderRequest) returns (SubmitOrderResponse);
+
+  /**
+   * Streams Order Book depth and ticker updates to connected clients.
+   */
+  rpc StreamMarketData (MarketDataStreamRequest) returns (stream MarketDataProto);
+}
