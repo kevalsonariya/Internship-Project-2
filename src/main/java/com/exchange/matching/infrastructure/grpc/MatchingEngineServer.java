@@ -53,7 +53,7 @@ public class MatchingEngineServer {
         this.serviceImpl = new OrderMatchingServiceImpl(disruptorEngine, orderBook);
 
         this.server = ServerBuilder.forPort(port)
-                .addService(serviceImpl)
+                .addService(serviceImpl.bindService())
                 .build();
     }
 
@@ -72,7 +72,7 @@ public class MatchingEngineServer {
         this.serviceImpl = new OrderMatchingServiceImpl(disruptorEngine, orderBook);
 
         this.server = ServerBuilder.forPort(port)
-                .addService(serviceImpl)
+                .addService(serviceImpl.bindService())
                 .build();
     }
 
