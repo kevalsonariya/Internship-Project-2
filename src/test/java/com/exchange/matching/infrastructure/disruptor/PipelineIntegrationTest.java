@@ -66,10 +66,22 @@ class PipelineIntegrationTest {
         assertNull(orderBook.getOrder("BID1")); // Bid is fully filled, so not resting
         assertNotNull(orderBook.getOrder("ASK1")); // Ask is resting
         assertEquals(0.5, orderBook.getOrder("ASK1").getRemainingQuantity());
+
+        // Verify PersistenceHandler persisted order states to Chronicle Map
+        PersistenceHandler persistenceHandler = disruptorEngine.getPersistenceHandler();
+        assertNotNull(persistenceHandler);
+        assertNotNull(persistenceHandler.getOrderState("ASK1"));
+        assertEquals("ASK1", persistenceHandler.getOrderState("ASK1").getOrderId());
+        assertEquals(SYMBOL, persistenceHandler.getOrderState("ASK1").getSymbol());
+        assertEquals(50000.0, persistenceHandler.getOrderState("ASK1").getPrice());
+        assertEquals(1.5, persistenceHandler.getOrderState("ASK1").getQuantity());
+
+        assertNotNull(persistenceHandler.getOrderState("BID1"));
+        assertEquals("BID1", persistenceHandler.getOrderState("BID1").getOrderId());
     }
 
     @Test
-    @DisplayName("E2E Integration: RiskValidationHandler should reject invalid orders and block them from matching")
+    @DisplayName("E2E Integration: RiskValidationHandler should reject invalid orders and block them from matching and persistence")
     void testE2EPipelineRiskRejections() throws InterruptedException {
         // Case 1: Negative Price order
         disruptorEngine.getProducer().onData(
@@ -94,5 +106,11 @@ class PipelineIntegrationTest {
         assertNull(orderBook.getOrder("NEG-QTY"));
         assertEquals(0, orderBook.getBidOrderCount());
         assertEquals(0, orderBook.getAskOrderCount());
+
+        // Verify rejected orders are not persisted in PersistenceHandler
+        PersistenceHandler persistenceHandler = disruptorEngine.getPersistenceHandler();
+        assertNull(persistenceHandler.getOrderState("BAD-PRICE"));
+        assertNull(persistenceHandler.getOrderState("BAD-QTY"));
+        assertNull(persistenceHandler.getOrderState("NEG-QTY"));
     }
 }
