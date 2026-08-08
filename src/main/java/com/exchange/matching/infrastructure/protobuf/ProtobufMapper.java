@@ -69,8 +69,7 @@ public final class ProtobufMapper {
                 proto.getFilledQuantity(),
                 proto.getTimestamp(),
                 toDomain(proto.getOrderType()),
-                toDomain(proto.getStatus())
-        );
+                toDomain(proto.getStatus()));
     }
 
     /**
@@ -115,12 +114,12 @@ public final class ProtobufMapper {
                 proto.getQuantity(),
                 proto.getTimestamp(),
                 proto.getMakerOrderId(),
-                proto.getTakerOrderId()
-        );
+                proto.getTakerOrderId());
     }
 
     /**
-     * Converts a domain {@link PriceLevel} record to a {@link PriceLevelProto} message.
+     * Converts a domain {@link PriceLevel} record to a {@link PriceLevelProto}
+     * message.
      *
      * @param priceLevel domain price level record
      * @return protobuf price level proto message
@@ -137,7 +136,8 @@ public final class ProtobufMapper {
     }
 
     /**
-     * Converts a {@link PriceLevelProto} message to a domain {@link PriceLevel} record.
+     * Converts a {@link PriceLevelProto} message to a domain {@link PriceLevel}
+     * record.
      *
      * @param proto protobuf price level proto message
      * @return domain price level record
@@ -149,12 +149,12 @@ public final class ProtobufMapper {
         return new PriceLevel(
                 proto.getPrice(),
                 proto.getQuantity(),
-                proto.getOrderCount()
-        );
+                proto.getOrderCount());
     }
 
     /**
-     * Converts a domain {@link MarketData} record to a {@link MarketDataProto} message.
+     * Converts a domain {@link MarketData} record to a {@link MarketDataProto}
+     * message.
      *
      * @param marketData domain market data record
      * @return protobuf market data proto message
@@ -184,7 +184,8 @@ public final class ProtobufMapper {
     }
 
     /**
-     * Converts a {@link MarketDataProto} message to a domain {@link MarketData} record.
+     * Converts a {@link MarketDataProto} message to a domain {@link MarketData}
+     * record.
      *
      * @param proto protobuf market data proto message
      * @return domain market data record
@@ -209,8 +210,7 @@ public final class ProtobufMapper {
                 bids,
                 asks,
                 proto.getLastPrice(),
-                proto.getVolume24H()
-        );
+                proto.getVolume24H());
     }
 
     /**
@@ -220,7 +220,8 @@ public final class ProtobufMapper {
      * @return protobuf order side
      */
     public static OrderSideProto toProto(OrderSide side) {
-        if (side == null) return OrderSideProto.ORDER_SIDE_UNSPECIFIED;
+        if (side == null)
+            return OrderSideProto.ORDER_SIDE_UNSPECIFIED;
         return switch (side) {
             case BUY -> OrderSideProto.BUY;
             case SELL -> OrderSideProto.SELL;
@@ -234,7 +235,8 @@ public final class ProtobufMapper {
      * @return domain order side
      */
     public static OrderSide toDomain(OrderSideProto proto) {
-        if (proto == null) return OrderSide.BUY;
+        if (proto == null)
+            return OrderSide.BUY;
         return switch (proto) {
             case BUY -> OrderSide.BUY;
             case SELL -> OrderSide.SELL;
@@ -249,7 +251,8 @@ public final class ProtobufMapper {
      * @return protobuf order type
      */
     public static OrderTypeProto toProto(OrderType type) {
-        if (type == null) return OrderTypeProto.ORDER_TYPE_UNSPECIFIED;
+        if (type == null)
+            return OrderTypeProto.ORDER_TYPE_UNSPECIFIED;
         return switch (type) {
             case LIMIT -> OrderTypeProto.LIMIT;
             case MARKET -> OrderTypeProto.MARKET;
@@ -263,7 +266,8 @@ public final class ProtobufMapper {
      * @return domain order type
      */
     public static OrderType toDomain(OrderTypeProto proto) {
-        if (proto == null) return OrderType.LIMIT;
+        if (proto == null)
+            return OrderType.LIMIT;
         return switch (proto) {
             case LIMIT -> OrderType.LIMIT;
             case MARKET -> OrderType.MARKET;
@@ -278,7 +282,8 @@ public final class ProtobufMapper {
      * @return protobuf order status
      */
     public static OrderStatusProto toProto(OrderStatus status) {
-        if (status == null) return OrderStatusProto.ORDER_STATUS_UNSPECIFIED;
+        if (status == null)
+            return OrderStatusProto.ORDER_STATUS_UNSPECIFIED;
         return switch (status) {
             case NEW -> OrderStatusProto.NEW;
             case PARTIALLY_FILLED -> OrderStatusProto.PARTIALLY_FILLED;
@@ -295,7 +300,8 @@ public final class ProtobufMapper {
      * @return domain order status
      */
     public static OrderStatus toDomain(OrderStatusProto proto) {
-        if (proto == null) return OrderStatus.NEW;
+        if (proto == null)
+            return OrderStatus.NEW;
         return switch (proto) {
             case NEW -> OrderStatus.NEW;
             case PARTIALLY_FILLED -> OrderStatus.PARTIALLY_FILLED;
