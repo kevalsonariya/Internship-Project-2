@@ -20,6 +20,7 @@ public class DisruptorEngine {
 
     private final Disruptor<OrderEvent> disruptor;
     private final OrderEventProducer producer;
+    private final PersistenceHandler persistenceHandler;
 
     /**
      * Constructs a DisruptorEngine with default configuration (1024 buffer size, BusySpinWaitStrategy, Single Producer).
@@ -49,13 +50,31 @@ public class DisruptorEngine {
     public DisruptorEngine(int bufferSize, WaitStrategy waitStrategy, 
                            com.exchange.matching.domain.model.IOrderBook orderBook, 
                            com.exchange.matching.infrastructure.pool.OrderPool orderPool) {
+        this(bufferSize, waitStrategy, orderBook, orderPool, new PersistenceHandler());
+    }
+
+    /**
+     * Constructs a DisruptorEngine with custom capacity, wait strategy, order book, order pool, and persistence handler.
+     *
+     * @param bufferSize         must be a power of 2
+     * @param waitStrategy       wait strategy for consumers waiting on the ring buffer
+     * @param orderBook          the order book to match against
+     * @param orderPool          the order pool for borrowing/returning orders
+     * @param persistenceHandler custom persistence handler instance
+     */
+    public DisruptorEngine(int bufferSize, WaitStrategy waitStrategy,
+                           com.exchange.matching.domain.model.IOrderBook orderBook,
+                           com.exchange.matching.infrastructure.pool.OrderPool orderPool,
+                           PersistenceHandler persistenceHandler) {
         if (Integer.bitCount(bufferSize) != 1) {
             throw new IllegalArgumentException("bufferSize must be a power of 2");
         }
 
+        this.persistenceHandler = persistenceHandler;
+
+        java.util.concurrent.atomic.AtomicInteger threadCount = new java.util.concurrent.atomic.AtomicInteger(1);
         ThreadFactory threadFactory = r -> {
-            Thread thread = new Thread(r);
-            thread.setName("disruptor-worker");
+            Thread thread = new Thread(r, "disruptor-worker-" + threadCount.getAndIncrement());
             thread.setDaemon(true);
             return thread;
         };
@@ -73,10 +92,10 @@ public class DisruptorEngine {
         MatchingEngineHandler matchingHandler = new MatchingEngineHandler(orderBook, orderPool);
         JournalingHandler journalHandler = new JournalingHandler();
 
-        // Wire handlers sequentially: Risk -> Matching -> Journal
+        // Wire handlers sequentially: Risk -> Matching -> (Persistence + Journaling off hot path)
         this.disruptor.handleEventsWith(riskHandler)
                       .then(matchingHandler)
-                      .then(journalHandler);
+                      .then(this.persistenceHandler, journalHandler);
 
         this.producer = new OrderEventProducer(disruptor.getRingBuffer());
     }
@@ -93,6 +112,9 @@ public class DisruptorEngine {
      */
     public void shutdown() {
         disruptor.shutdown();
+        if (persistenceHandler != null) {
+            persistenceHandler.close();
+        }
     }
 
     /**
@@ -120,5 +142,14 @@ public class DisruptorEngine {
      */
     public Disruptor<OrderEvent> getDisruptor() {
         return disruptor;
+    }
+
+    /**
+     * Gets the persistence handler associated with this engine.
+     *
+     * @return the {@link PersistenceHandler}
+     */
+    public PersistenceHandler getPersistenceHandler() {
+        return persistenceHandler;
     }
 }

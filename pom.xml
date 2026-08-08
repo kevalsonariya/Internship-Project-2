@@ -11,8 +11,8 @@
     <description>Enterprise-grade, low-latency cryptocurrency matching engine using Clean Architecture and LMAX Disruptor.</description>
 
     <properties>
-        <maven.compiler.source>21</maven.compiler.source>
-        <maven.compiler.target>21</maven.compiler.target>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         
         <!-- Dependency Versions -->
@@ -92,13 +92,13 @@
         </extensions>
 
         <plugins>
-            <!-- Compiler Plugin configuration for Java 21 -->
+            <!-- Compiler Plugin configuration for Java 17 -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>${maven-compiler-plugin.version}</version>
                 <configuration>
-                    <release>21</release>
+                    <release>17</release>
                 </configuration>
             </plugin>
 
