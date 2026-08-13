@@ -59,9 +59,13 @@ public class MatchingEngineHandler implements EventHandler<OrderEvent> {
                 event.getOrderType()
         );
 
+        long startTimeNanos = System.nanoTime();
         try {
             // Execute match in order book
             List<Trade> trades = orderBook.match(order);
+            long latencyNanos = System.nanoTime() - startTimeNanos;
+            int tradeCount = trades != null ? trades.size() : 0;
+            com.exchange.matching.monitoring.MatchingEngineMetrics.getInstance().recordOrderProcessed(latencyNanos, tradeCount);
 
             if (trades != null && !trades.isEmpty()) {
                 LOGGER.info(() -> String.format(

@@ -98,6 +98,7 @@ public class DisruptorEngine {
                       .then(this.persistenceHandler, journalHandler);
 
         this.producer = new OrderEventProducer(disruptor.getRingBuffer());
+        com.exchange.matching.monitoring.MatchingEngineMetrics.getInstance().setRingBuffer(disruptor.getRingBuffer());
     }
 
     /**
