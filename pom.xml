@@ -11,13 +11,16 @@
     <description>Enterprise-grade, low-latency cryptocurrency matching engine using Clean Architecture and LMAX Disruptor.</description>
 
     <properties>
-        <maven.compiler.source>21</maven.compiler.source>
-        <maven.compiler.target>21</maven.compiler.target>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         
         <!-- Dependency Versions -->
         <disruptor.version>4.0.0</disruptor.version>
         <protobuf.version>4.28.2</protobuf.version>
+        <grpc.version>1.66.0</grpc.version>
+        <javax.annotation-api.version>1.3.2</javax.annotation-api.version>
+        <chronicle-map.version>2026.1</chronicle-map.version>
         <junit.jupiter.version>5.10.1</junit.jupiter.version>
         <mockito.version>5.10.0</mockito.version>
         <jmh.version>1.37</jmh.version>
@@ -37,24 +40,18 @@
             <version>${disruptor.version}</version>
         </dependency>
 
+        <!-- Chronicle Map for Off-Heap Low-Latency Persistence -->
+        <dependency>
+            <groupId>net.openhft</groupId>
+            <artifactId>chronicle-map</artifactId>
+            <version>${chronicle-map.version}</version>
+        </dependency>
+
         <!-- Protocol Buffers for Low-Latency Serialization -->
         <dependency>
             <groupId>com.google.protobuf</groupId>
             <artifactId>protobuf-java</artifactId>
             <version>${protobuf.version}</version>
-        </dependency>
-
-        <!-- JMH (Java Microbenchmark Harness) -->
-        <dependency>
-            <groupId>org.openjdk.jmh</groupId>
-            <artifactId>jmh-core</artifactId>
-            <version>${jmh.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.openjdk.jmh</groupId>
-            <artifactId>jmh-generator-annprocess</artifactId>
-            <version>${jmh.version}</version>
-            <scope>test</scope>
         </dependency>
 
         <!-- JUnit 5 API -->
@@ -98,13 +95,13 @@
         </extensions>
 
         <plugins>
-            <!-- Compiler Plugin configuration for Java 21 -->
+            <!-- Compiler Plugin configuration for Java 17 -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>${maven-compiler-plugin.version}</version>
                 <configuration>
-                    <release>21</release>
+                    <release>17</release>
                 </configuration>
             </plugin>
 
@@ -113,6 +110,19 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>${maven-surefire-plugin.version}</version>
+                <configuration>
+                    <argLine>
+                        --add-exports=java.base/jdk.internal.ref=ALL-UNNAMED
+                        --add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED
+                        --add-opens=java.base/java.lang=ALL-UNNAMED
+                        --add-opens=java.base/java.lang.reflect=ALL-UNNAMED
+                        --add-opens=java.base/java.io=ALL-UNNAMED
+                        --add-opens=java.base/java.util=ALL-UNNAMED
+                        --add-opens=java.base/java.nio=ALL-UNNAMED
+                        --add-opens=java.base/sun.nio.ch=ALL-UNNAMED
+                        --add-opens=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED
+                    </argLine>
+                </configuration>
             </plugin>
 
             <!-- Protobuf Compiler Plugin -->
@@ -122,14 +132,21 @@
                 <version>${protobuf-maven-plugin.version}</version>
                 <configuration>
                     <protocArtifact>com.google.protobuf:protoc:${protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
-                    <outputDirectory>${project.build.directory}/generated-sources/protobuf/java</outputDirectory>
+                    <pluginId>grpc-java</pluginId>
+                    <pluginArtifact>io.grpc:protoc-gen-grpc-java:${grpc.version}:exe:${os.detected.classifier}</pluginArtifact>
                     <clearOutputDirectory>false</clearOutputDirectory>
                 </configuration>
                 <executions>
                     <execution>
+                        <id>compile-proto</id>
                         <goals>
                             <goal>compile</goal>
-                            <goal>test-compile</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>compile-grpc</id>
+                        <goals>
+                            <goal>compile-custom</goal>
                         </goals>
                     </execution>
                 </executions>
@@ -150,6 +167,7 @@
                         <configuration>
                             <sources>
                                 <source>${project.build.directory}/generated-sources/protobuf/java</source>
+                                <source>${project.build.directory}/generated-sources/protobuf/grpc-java</source>
                             </sources>
                         </configuration>
                     </execution>
@@ -157,4 +175,54 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <profile>
+            <id>os-windows</id>
+            <activation>
+                <os>
+                    <family>windows</family>
+                </os>
+            </activation>
+            <properties>
+                <os.detected.classifier>windows-x86_64</os.detected.classifier>
+            </properties>
+        </profile>
+        <profile>
+            <id>os-linux</id>
+            <activation>
+                <os>
+                    <family>unix</family>
+                    <name>linux</name>
+                </os>
+            </activation>
+            <properties>
+                <os.detected.classifier>linux-x86_64</os.detected.classifier>
+            </properties>
+        </profile>
+        <profile>
+            <id>os-mac-x86</id>
+            <activation>
+                <os>
+                    <family>mac</family>
+                    <arch>x86_64</arch>
+                </os>
+            </activation>
+            <properties>
+                <os.detected.classifier>osx-x86_64</os.detected.classifier>
+            </properties>
+        </profile>
+        <profile>
+            <id>os-mac-aarch64</id>
+            <activation>
+                <os>
+                    <family>mac</family>
+                    <arch>aarch64</arch>
+                </os>
+            </activation>
+            <properties>
+                <os.detected.classifier>osx-aarch_64</os.detected.classifier>
+            </properties>
+        </profile>
+    </profiles>
 </project>
