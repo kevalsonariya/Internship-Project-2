@@ -17,21 +17,22 @@ import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.Warmup;
+import org.openjdk.jmh.infra.Blackhole;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.RunnerException;
 import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 
 import java.util.List;
+import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
 /**
- * JMH Microbenchmark suite for measuring latency of Order Matching operations.
+ * JMH Microbenchmark suite for measuring end-to-end latency of Order Matching operations.
  * <p>
- * Evaluates execution performance for:
- * 1. Limit order matching against resting depth
- * 2. Non-crossing limit order resting insertion
- * 3. Market order execution sweeping liquidity
+ * Simulates realistic crypto order flow (BTC-USDT) around a mid-market price spread
+ * and measures latency for limit matching, resting placement, market sweeps, and mixed order flow.
+ * Uses JMH {@link Blackhole} to eliminate Dead Code Elimination (DCE).
  * </p>
  */
 @BenchmarkMode(Mode.AverageTime)
@@ -43,75 +44,141 @@ import java.util.concurrent.TimeUnit;
 public class OrderMatchingBenchmark {
 
     private static final String SYMBOL = "BTC-USDT";
+    private static final double MID_PRICE = 50000.00;
+    private static final int PREGENERATED_ORDERS_COUNT = 1000;
+
     private OrderBook orderBook;
     private OrderPool orderPool;
+    private PreallocatedOrderData[] orderDataSequence;
+    private int sequenceIndex;
     private long orderCounter;
+
+    /**
+     * Helper holder for pre-allocated order parameters to eliminate random generation overhead during benchmarking.
+     */
+    private record PreallocatedOrderData(
+            String orderId,
+            OrderSide side,
+            double price,
+            double quantity,
+            OrderType orderType
+    ) {}
 
     @Setup(Level.Trial)
     public void setupTrial() {
-        orderPool = new OrderPool(1000, 10000);
+        orderPool = new OrderPool(5000, 50000);
+        orderDataSequence = new PreallocatedOrderData[PREGENERATED_ORDERS_COUNT];
+        Random random = new Random(42); // Fixed seed for reproducible benchmarks
+
+        // Pre-generate a realistic stream of buy/sell orders around mid-price 50,000.00
+        for (int i = 0; i < PREGENERATED_ORDERS_COUNT; i++) {
+            OrderSide side = random.nextBoolean() ? OrderSide.BUY : OrderSide.SELL;
+            OrderType type = (random.nextDouble() < 0.85) ? OrderType.LIMIT : OrderType.MARKET;
+            
+            // Generate price variance (-2.0% to +2.0% of mid-price)
+            double offset = (random.nextDouble() - 0.5) * 0.04 * MID_PRICE;
+            double price = Math.round((MID_PRICE + offset) * 100.0) / 100.0;
+            double quantity = Math.round((0.1 + random.nextDouble() * 2.0) * 1000.0) / 1000.0;
+
+            orderDataSequence[i] = new PreallocatedOrderData(
+                    "PRE-" + i,
+                    side,
+                    type == OrderType.MARKET ? 0.0 : price,
+                    quantity,
+                    type
+            );
+        }
     }
 
     @Setup(Level.Invocation)
     public void setupInvocation() {
         orderBook = new OrderBook(SYMBOL);
+        sequenceIndex = 0;
         orderCounter = 0;
 
-        // Populate order book with resting liquidity depth
-        // Bids: 99.0 down to 90.0
-        // Asks: 101.0 up to 110.0
-        for (int i = 1; i <= 50; i++) {
+        // Seed initial order book with 100 resting bids and 100 resting asks around mid-price
+        for (int i = 1; i <= 100; i++) {
             Order bid = orderPool.borrowOrder();
-            bid.init("BID-" + i, SYMBOL, OrderSide.BUY, 100.0 - i * 0.5, 10.0, System.currentTimeMillis(), OrderType.LIMIT);
+            bid.init("SEED-BID-" + i, SYMBOL, OrderSide.BUY, MID_PRICE - i * 0.5, 5.0, System.currentTimeMillis(), OrderType.LIMIT);
             orderBook.addOrder(bid);
 
             Order ask = orderPool.borrowOrder();
-            ask.init("ASK-" + i, SYMBOL, OrderSide.SELL, 100.0 + i * 0.5, 10.0, System.currentTimeMillis(), OrderType.LIMIT);
+            ask.init("SEED-ASK-" + i, SYMBOL, OrderSide.SELL, MID_PRICE + i * 0.5, 5.0, System.currentTimeMillis(), OrderType.LIMIT);
             orderBook.addOrder(ask);
         }
     }
 
     /**
-     * Benchmark measuring latency of matching a Limit BUY order against resting ASK liquidity.
+     * Benchmark measuring latency of a single crossing Limit BUY order execution against resting ASK depth.
      */
     @Benchmark
-    public List<Trade> benchmarkLimitOrderMatching() {
+    public void benchmarkLimitOrderMatchingLatency(Blackhole bh) {
         orderCounter++;
         Order taker = orderPool.borrowOrder();
-        taker.init("TAKER-LIMIT-" + orderCounter, SYMBOL, OrderSide.BUY, 101.50, 5.0, System.currentTimeMillis(), OrderType.LIMIT);
+        taker.init("TAKER-LIMIT-" + orderCounter, SYMBOL, OrderSide.BUY, MID_PRICE + 1.0, 2.5, System.currentTimeMillis(), OrderType.LIMIT);
+        
         List<Trade> trades = orderBook.match(taker);
+        bh.consume(trades);
+        bh.consume(taker);
+
         if (taker.isFilled()) {
             orderPool.returnOrder(taker);
         }
-        return trades;
     }
 
     /**
-     * Benchmark measuring latency of placing a non-crossing Limit BUY order that rests on the order book.
+     * Benchmark measuring latency of inserting a non-crossing Limit BUY order that rests on the order book.
      */
     @Benchmark
-    public List<Trade> benchmarkLimitOrderResting() {
+    public void benchmarkLimitOrderRestingLatency(Blackhole bh) {
         orderCounter++;
         Order taker = orderPool.borrowOrder();
-        taker.init("TAKER-REST-" + orderCounter, SYMBOL, OrderSide.BUY, 95.00, 1.0, System.currentTimeMillis(), OrderType.LIMIT);
-        return orderBook.match(taker);
-    }
-
-    /**
-     * Benchmark measuring latency of executing a Market BUY order that sweeps multiple ask levels.
-     */
-    @Benchmark
-    public List<Trade> benchmarkMarketOrderMatching() {
-        orderCounter++;
-        Order taker = orderPool.borrowOrder();
-        taker.init("TAKER-MKT-" + orderCounter, SYMBOL, OrderSide.BUY, 0.0, 25.0, System.currentTimeMillis(), OrderType.MARKET);
+        taker.init("TAKER-REST-" + orderCounter, SYMBOL, OrderSide.BUY, MID_PRICE - 50.0, 1.0, System.currentTimeMillis(), OrderType.LIMIT);
+        
         List<Trade> trades = orderBook.match(taker);
-        orderPool.returnOrder(taker);
-        return trades;
+        bh.consume(trades);
+        bh.consume(taker);
     }
 
     /**
-     * Standalone runner method to launch JMH benchmarks from command-line or IDE.
+     * Benchmark measuring latency of executing a Market BUY order sweeping multiple ask price levels.
+     */
+    @Benchmark
+    public void benchmarkMarketOrderSweepLatency(Blackhole bh) {
+        orderCounter++;
+        Order taker = orderPool.borrowOrder();
+        taker.init("TAKER-MKT-" + orderCounter, SYMBOL, OrderSide.BUY, 0.0, 15.0, System.currentTimeMillis(), OrderType.MARKET);
+        
+        List<Trade> trades = orderBook.match(taker);
+        bh.consume(trades);
+        bh.consume(taker);
+
+        orderPool.returnOrder(taker);
+    }
+
+    /**
+     * Benchmark simulating a realistic, continuous mixed order flow (Limit & Market, Buy & Sell).
+     */
+    @Benchmark
+    public void benchmarkRealisticOrderFlow(Blackhole bh) {
+        PreallocatedOrderData data = orderDataSequence[sequenceIndex];
+        sequenceIndex = (sequenceIndex + 1) % PREGENERATED_ORDERS_COUNT;
+        orderCounter++;
+
+        Order order = orderPool.borrowOrder();
+        order.init("FLOW-" + orderCounter, SYMBOL, data.side(), data.price(), data.quantity(), System.currentTimeMillis(), data.orderType());
+
+        List<Trade> trades = orderBook.match(order);
+        bh.consume(trades);
+        bh.consume(order);
+
+        if (order.isFilled() || order.getOrderType() == OrderType.MARKET) {
+            orderPool.returnOrder(order);
+        }
+    }
+
+    /**
+     * Standalone runner method to launch JMH latency benchmarks directly from main.
      */
     public static void main(String[] args) throws RunnerException {
         Options opt = new OptionsBuilder()

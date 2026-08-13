@@ -18,19 +18,20 @@ import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Warmup;
+import org.openjdk.jmh.infra.Blackhole;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.RunnerException;
 import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 
+import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
 /**
- * JMH Microbenchmark suite for measuring end-to-end throughput of the LMAX Disruptor Ring Buffer.
+ * JMH Microbenchmark suite for measuring end-to-end throughput (ops/sec) of the LMAX Disruptor Ring Buffer.
  * <p>
- * Evaluates performance for:
- * 1. Continuous single-producer order event ingestion
- * 2. High-density burst order event publishing
+ * Stress-tests the Disruptor engine under heavy concurrent/burst load with realistic market order flows.
+ * Uses JMH {@link Blackhole} to eliminate Dead Code Elimination (DCE).
  * </p>
  */
 @BenchmarkMode(Mode.Throughput)
@@ -42,18 +43,50 @@ import java.util.concurrent.TimeUnit;
 public class RingBufferThroughputBenchmark {
 
     private static final String SYMBOL = "BTC-USDT";
+    private static final double MID_PRICE = 50000.00;
+    private static final int PREGENERATED_BATCH_SIZE = 5000;
+
     private DisruptorEngine disruptorEngine;
     private OrderBook orderBook;
     private OrderPool orderPool;
+    private PreallocatedEventData[] eventDataBatch;
+    private int eventIndex;
     private long seq;
+
+    /**
+     * Helper holder for pre-allocated event parameters.
+     */
+    private record PreallocatedEventData(
+            OrderSide side,
+            double price,
+            double quantity,
+            OrderType orderType
+    ) {}
 
     @Setup(Level.Trial)
     public void setupTrial() {
         orderBook = new OrderBook(SYMBOL);
-        orderPool = new OrderPool(10000, 100000);
-        // Initialize DisruptorEngine with a 65536 Ring Buffer size and BusySpinWaitStrategy for max throughput
+        orderPool = new OrderPool(50000, 200000);
+
+        // Initialize DisruptorEngine with a 65536 Ring Buffer size and BusySpinWaitStrategy for maximum throughput
         disruptorEngine = new DisruptorEngine(65536, new BusySpinWaitStrategy(), orderBook, orderPool);
         disruptorEngine.start();
+
+        // Pre-allocate realistic event data to prevent random generation overhead during throughput testing
+        eventDataBatch = new PreallocatedEventData[PREGENERATED_BATCH_SIZE];
+        Random random = new Random(100); // Fixed seed for reproducible throughput tests
+
+        for (int i = 0; i < PREGENERATED_BATCH_SIZE; i++) {
+            OrderSide side = random.nextBoolean() ? OrderSide.BUY : OrderSide.SELL;
+            OrderType type = (random.nextDouble() < 0.90) ? OrderType.LIMIT : OrderType.MARKET;
+            double offset = (random.nextDouble() - 0.5) * 0.02 * MID_PRICE;
+            double price = type == OrderType.MARKET ? 0.0 : Math.round((MID_PRICE + offset) * 100.0) / 100.0;
+            double quantity = Math.round((0.5 + random.nextDouble() * 5.0) * 100.0) / 100.0;
+
+            eventDataBatch[i] = new PreallocatedEventData(side, price, quantity, type);
+        }
+
+        eventIndex = 0;
         seq = 0;
     }
 
@@ -65,43 +98,51 @@ public class RingBufferThroughputBenchmark {
     }
 
     /**
-     * Benchmark measuring operations per second for single-producer order event publishing into the Ring Buffer.
+     * Benchmark measuring single-producer continuous order ingestion throughput (ops/sec).
      */
     @Benchmark
-    public void benchmarkSingleProducerThroughput() {
+    public void benchmarkSingleProducerThroughput(Blackhole bh) {
         seq++;
+        PreallocatedEventData data = eventDataBatch[eventIndex];
+        eventIndex = (eventIndex + 1) % PREGENERATED_BATCH_SIZE;
+
         disruptorEngine.getProducer().onData(
                 "ORD-" + seq,
                 SYMBOL,
-                (seq % 2 == 0) ? OrderSide.BUY : OrderSide.SELL,
-                50000.0 + (seq % 10),
-                1.0,
+                data.side(),
+                data.price(),
+                data.quantity(),
                 System.currentTimeMillis(),
-                OrderType.LIMIT
+                data.orderType()
         );
+        bh.consume(seq);
     }
 
     /**
-     * Benchmark measuring throughput during burst publishing of 100 consecutive order events.
+     * Stress benchmark measuring throughput during high-density burst publishing (500 orders per invocation).
      */
     @Benchmark
-    public void benchmarkBurstOrderPublishing() {
-        for (int i = 0; i < 100; i++) {
+    public void benchmarkHighVolumeBurstIngestion(Blackhole bh) {
+        for (int i = 0; i < 500; i++) {
             seq++;
+            PreallocatedEventData data = eventDataBatch[eventIndex];
+            eventIndex = (eventIndex + 1) % PREGENERATED_BATCH_SIZE;
+
             disruptorEngine.getProducer().onData(
                     "BURST-" + seq,
                     SYMBOL,
-                    (seq % 2 == 0) ? OrderSide.BUY : OrderSide.SELL,
-                    50000.0 + (seq % 20),
-                    0.5,
+                    data.side(),
+                    data.price(),
+                    data.quantity(),
                     System.currentTimeMillis(),
-                    OrderType.LIMIT
+                    data.orderType()
             );
         }
+        bh.consume(seq);
     }
 
     /**
-     * Standalone runner method to launch JMH benchmarks from command-line or IDE.
+     * Standalone runner method to launch JMH throughput benchmarks directly from main.
      */
     public static void main(String[] args) throws RunnerException {
         Options opt = new OptionsBuilder()
