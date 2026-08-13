@@ -45,6 +45,9 @@ public class OrderBook implements IOrderBook {
      */
     private final Map<String, Order> orderIndex;
 
+    // Cache line padding (64 bytes) to isolate book lookup structures from trade execution metrics
+    protected long p1, p2, p3, p4, p5, p6, p7;
+
     /**
      * Price of the last executed trade.
      */
@@ -59,6 +62,9 @@ public class OrderBook implements IOrderBook {
      * Sequence counter for generating unique trade identifiers.
      */
     private long tradeIdSequence;
+
+    // Cache line padding (64 bytes) after write-frequent metrics
+    protected long p8, p9, p10, p11, p12, p13, p14;
 
     /**
      * Constructs a new empty OrderBook for the specified trading symbol.

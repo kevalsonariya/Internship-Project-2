@@ -12,6 +12,9 @@ import com.exchange.matching.domain.enums.OrderType;
  */
 public class OrderEvent {
 
+    // Front cache line padding (64 bytes) to prevent false sharing with preceding RingBuffer elements
+    protected long p1, p2, p3, p4, p5, p6, p7;
+
     private String orderId;
     private String symbol;
     private OrderSide side;
@@ -20,6 +23,9 @@ public class OrderEvent {
     private long timestamp;
     private OrderType orderType;
     private boolean rejected;
+
+    // Back cache line padding (64 bytes) to prevent false sharing with succeeding RingBuffer elements
+    protected long p8, p9, p10, p11, p12, p13, p14;
 
     /**
      * Default constructor. Pre-allocated instances start with default uninitialized state.

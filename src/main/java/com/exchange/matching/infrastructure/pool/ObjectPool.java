@@ -16,10 +16,16 @@ import java.util.function.Supplier;
  */
 public class ObjectPool<T> {
 
+    // Cache line padding (64 bytes) to prevent false sharing between ObjectPool fields and surrounding heap structures
+    protected long p1, p2, p3, p4, p5, p6, p7;
+
     private final Queue<T> pool;
     private final Supplier<T> factory;
     private final Consumer<T> resetter;
     private final int maxCapacity;
+
+    // Cache line padding (64 bytes) after pool pointers
+    protected long p8, p9, p10, p11, p12, p13, p14;
 
     /**
      * Constructs a new ObjectPool with specified capacities and object lifecycle hooks.
