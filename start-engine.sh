@@ -25,29 +25,26 @@ echo "==========================================================================
 # - Generational ZGC for <1ms pause times
 # - Pre-touched heap to prevent OS page fault latency spikes
 # - Cache-line aware reflection exports for Java 17/21
-JAVA_OPTS="
-  -XX:+UseZGC
-  -XX:+ZGenerational
-  -Xms4g
-  -Xmx4g
-  -XX:+AlwaysPreTouch
-  -XX:+UseLargePages
-  -XX:ZAllocationSpikeTolerance=5
-  -XX:GuaranteedSafepointInterval=0
-  -XX:+UseNUMA
-  --add-exports=java.base/jdk.internal.ref=ALL-UNNAMED
-  --add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED
-  --add-opens=java.base/java.lang=ALL-UNNAMED
-  --add-opens=java.base/java.lang.reflect=ALL-UNNAMED
-  --add-opens=java.base/java.io=ALL-UNNAMED
-  --add-opens=java.base/java.util=ALL-UNNAMED
-  --add-opens=java.base/java.nio=ALL-UNNAMED
-  --add-opens=java.base/sun.nio.ch=ALL-UNNAMED
-  --add-opens=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED
-  -Dcom.sun.management.jmxremote
-  -Dcom.sun.management.jmxremote.port=9010
-  -Dcom.sun.management.jmxremote.authenticate=false
-  -Dcom.sun.management.jmxremote.ssl=false
+JAVA_OPTS="\
+-Xms2g \
+-Xmx2g \
+-XX:+UseZGC \
+-XX:+AlwaysPreTouch \
+-XX:ZAllocationSpikeTolerance=5 \
+-XX:GuaranteedSafepointInterval=0 \
+--add-exports=java.base/jdk.internal.ref=ALL-UNNAMED \
+--add-exports=java.base/sun.nio.ch=ALL-UNNAMED \
+--add-exports=jdk.unsupported/sun.misc=ALL-UNNAMED \
+--add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED \
+--add-opens=jdk.compiler/com.sun.tools.javac=ALL-UNNAMED \
+--add-opens=java.base/java.lang=ALL-UNNAMED \
+--add-opens=java.base/java.lang.reflect=ALL-UNNAMED \
+--add-opens=java.base/java.io=ALL-UNNAMED \
+--add-opens=java.base/java.util=ALL-UNNAMED \
+-Dcom.sun.management.jmxremote \
+-Dcom.sun.management.jmxremote.port=9010 \
+-Dcom.sun.management.jmxremote.authenticate=false \
+-Dcom.sun.management.jmxremote.ssl=false \
 "
 
 exec java $JAVA_OPTS -jar "$JAR_FILE" "$@"
