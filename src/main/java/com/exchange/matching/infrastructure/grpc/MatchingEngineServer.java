@@ -1,10 +1,11 @@
 package com.exchange.matching.infrastructure.grpc;
 
+import com.exchange.matching.config.ConfigLoader;
 import com.exchange.matching.domain.model.IOrderBook;
 import com.exchange.matching.domain.model.OrderBook;
 import com.exchange.matching.infrastructure.disruptor.DisruptorEngine;
 import com.exchange.matching.infrastructure.pool.OrderPool;
-import com.lmax.disruptor.BusySpinWaitStrategy;
+import com.lmax.disruptor.WaitStrategy;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 
@@ -17,7 +18,8 @@ import java.util.logging.Logger;
  * Main application bootstrap and gRPC server entry point for the Order Matching Engine.
  * <p>
  * Initializes domain OrderBook, OrderPool, LMAX Disruptor engine pipeline, off-heap persistence,
- * and starts the gRPC server listening for client RPC requests.
+ * and starts the gRPC server listening for client RPC requests. Configuration parameters (ring buffer size,
+ * wait strategy, symbol, and pool capacities) are dynamically loaded via {@link ConfigLoader}.
  * </p>
  */
 public class MatchingEngineServer {
@@ -33,23 +35,59 @@ public class MatchingEngineServer {
     private final OrderPool orderPool;
 
     /**
-     * Constructs a MatchingEngineServer listening on default port 9090 for symbol BTC-USDT.
+     * Constructs a MatchingEngineServer listening on default port 9090 using settings from config.properties.
      */
     public MatchingEngineServer() {
-        this(DEFAULT_PORT, "BTC-USDT");
+        this(DEFAULT_PORT, ConfigLoader.load());
     }
 
     /**
-     * Constructs a MatchingEngineServer listening on specified port for specified trading symbol.
+     * Constructs a MatchingEngineServer listening on specified port using settings from config.properties.
+     *
+     * @param port port to bind gRPC server
+     */
+    public MatchingEngineServer(int port) {
+        this(port, ConfigLoader.load());
+    }
+
+    /**
+     * Constructs a MatchingEngineServer listening on specified port using provided ConfigLoader.
+     *
+     * @param port         port to bind gRPC server
+     * @param configLoader configuration loader instance
+     */
+    public MatchingEngineServer(int port, ConfigLoader configLoader) {
+        this(port, configLoader.getPrimarySymbol(), configLoader);
+    }
+
+    /**
+     * Constructs a MatchingEngineServer listening on specified port for specified trading symbol using config.properties.
      *
      * @param port   port to bind gRPC server
      * @param symbol trading instrument symbol
      */
     public MatchingEngineServer(int port, String symbol) {
+        this(port, symbol, ConfigLoader.load());
+    }
+
+    /**
+     * Constructs a MatchingEngineServer listening on specified port for specified trading symbol with custom ConfigLoader.
+     *
+     * @param port         port to bind gRPC server
+     * @param symbol       trading instrument symbol
+     * @param configLoader configuration loader instance
+     */
+    public MatchingEngineServer(int port, String symbol, ConfigLoader configLoader) {
         this.port = port;
+        int ringBufferSize = configLoader.getDisruptorRingBufferSize();
+        WaitStrategy waitStrategy = configLoader.getDisruptorWaitStrategy();
+        int maxOrderCapacity = configLoader.getOrderPoolMaxCapacity();
+        boolean prefillEnabled = configLoader.isPoolPrefillEnabled();
+        int initialOrderCapacity = prefillEnabled ? Math.min(10000, maxOrderCapacity) : 0;
+
         this.orderBook = new OrderBook(symbol);
-        this.orderPool = new OrderPool(1000, 10000);
-        this.disruptorEngine = new DisruptorEngine(1024, new BusySpinWaitStrategy(), orderBook, orderPool);
+        this.orderPool = new OrderPool(initialOrderCapacity, maxOrderCapacity);
+        this.disruptorEngine = new DisruptorEngine(ringBufferSize, waitStrategy, orderBook, orderPool);
         this.serviceImpl = new OrderMatchingServiceImpl(disruptorEngine, orderBook);
 
         this.server = ServerBuilder.forPort(port)
@@ -149,7 +187,8 @@ public class MatchingEngineServer {
         }
 
         try {
-            MatchingEngineServer server = new MatchingEngineServer(serverPort, "BTC-USDT");
+            ConfigLoader configLoader = ConfigLoader.load();
+            MatchingEngineServer server = new MatchingEngineServer(serverPort, configLoader);
             server.start();
             server.blockUntilShutdown();
         } catch (Exception e) {
