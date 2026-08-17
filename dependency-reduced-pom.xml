@@ -19,7 +19,7 @@
         <artifactId>maven-compiler-plugin</artifactId>
         <version>${maven-compiler-plugin.version}</version>
         <configuration>
-          <release>17</release>
+          <release>21</release>
         </configuration>
       </plugin>
       <plugin>
@@ -233,13 +233,13 @@
     <disruptor.version>4.0.0</disruptor.version>
     <protobuf-maven-plugin.version>0.6.1</protobuf-maven-plugin.version>
     <grpc.version>1.66.0</grpc.version>
-    <maven.compiler.source>17</maven.compiler.source>
+    <maven.compiler.source>21</maven.compiler.source>
     <chronicle-map.version>2026.1</chronicle-map.version>
     <maven-shade-plugin.version>3.5.1</maven-shade-plugin.version>
     <maven-compiler-plugin.version>3.11.0</maven-compiler-plugin.version>
     <mockito.version>5.10.0</mockito.version>
     <junit.jupiter.version>5.10.1</junit.jupiter.version>
-    <maven.compiler.target>17</maven.compiler.target>
+    <maven.compiler.target>21</maven.compiler.target>
     <maven-surefire-plugin.version>3.2.2</maven-surefire-plugin.version>
     <exec-maven-plugin.version>3.2.0</exec-maven-plugin.version>
   </properties>

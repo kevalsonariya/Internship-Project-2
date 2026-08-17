@@ -14,7 +14,7 @@
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        
+
         <!-- Dependency Versions -->
         <disruptor.version>4.0.0</disruptor.version>
         <protobuf.version>4.28.2</protobuf.version>
@@ -24,7 +24,7 @@
         <junit.jupiter.version>5.10.1</junit.jupiter.version>
         <mockito.version>5.10.0</mockito.version>
         <jmh.version>1.37</jmh.version>
-        
+
         <!-- Plugin Versions -->
         <maven-compiler-plugin.version>3.11.0</maven-compiler-plugin.version>
         <maven-surefire-plugin.version>3.2.2</maven-surefire-plugin.version>
